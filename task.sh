@@ -1,14 +1,11 @@
 #/usr/bin/env bash
-#MRUNNER --NODES=localhost
+#MRUNNER --NODES=10.10.10.1[1-3],10.10.10.15
+#MRUNNER --CONTAINER=container_name
+
 set -u
 
-script_root_dir=$(realpath "$(dirname ${BASH_SOURCE[0]})")
-echo "script_root_dir: ${script_root_dir}"
-
-export CUDA_DEVICE_MAX_CONNECTIONS=1
+# set some environment variables here
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-export OMP_NUM_THREADS=1
-export NCCL_DEBUG=WARN
 
 # Change for multinode config
 DISTRIBUTED_ARGS=(
@@ -17,11 +14,8 @@ DISTRIBUTED_ARGS=(
     --node_rank $NODE_RANK
     --master_addr $MASTER_ADDR 
     --master_port 8768
-    --rdzv-id $TASK_ID
 )
 echo "distributed args: ${DISTRIBUTED_ARGS[@]}"
 
-# torchrun ${DISTRIBUTED_ARGS[@]} \
-#     ${script_root_dir}/train.py \
-#         --model-path path/to/model \
-#         2>&1 | tee -a output_rank${NODE_RANK}.log
+torchrun ${DISTRIBUTED_ARGS[@]} \
+    path/to/train.py 

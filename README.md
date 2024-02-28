@@ -1,35 +1,50 @@
-## 多机运行脚本（torchrun, ...）
+## `mrunner`: run deep learning tasks (torchrun, ...) on multiple nodes
 
-### 1. 安装依赖包
+When running deep learning tasks on multiple nodes (such as using the torchrun launcher), you need to execute the task script on each node and set different rank parameters for each node. When there are many nodes, this process will be very cumbersome, especially deep learning tasks that may be started and disconnected frequently. Therefore, this tool simplifies the process: execute the script once and it can run simultaneously on multiple nodes.
 
-- pdsh
+### 1. Usage
 
-  `apt install pdsh`
-
-- ssh
-
-  将[config](config)文件修改后放到`~/.ssh/`路径下，并配置节点间免密连接
-
-### 2. task脚本
-
-task脚本开头需要写上用哪些节点进行运算
-
-```
-#MRUNNER --NODES=localhost
-```
-
-其中的节点名称需要与[config](config)文件中的Host名称对应，有效的写法包括：
-- `#MRUNNER --NODES=worker[1-2]`
-- `#MRUNNER --NODES=worker1,worker2`
-
-以上两种写法均表示使用`worker1`和`worker2`两个节点
-
-### 3. 启动`mrunner`
+It's very simple to use `mrunner`, just execute 
 
 ```bash
-./mrunner.sh task.sh
-
-# 也可以传递参数给task.sh脚本
-# ./mrunner.sh task.sh 1 2
+./mrunner your_task_script.sh
 ```
 
+mrunner will read some information from the script, including:
+1. Node information: On which nodes the script needs to be run. Running tasks on multiple nodes is achieved through the `pdsh` tool. Therefore, you can specify which nodes need to run the task through the syntax of `pdsh`, and you should install `pdsh` tool (eg. `apt install pdsh`)
+2. Container name on the node: mrunner assumes that the task is running in docker
+
+A simple [torchrun script](./task.sh) is as follows:
+
+```bash
+#/usr/bin/env bash
+#MRUNNER --NODES=10.10.10.1[1-3],10.10.10.15
+#MRUNNER --CONTAINER=container_name
+
+set -u
+
+# set some environment variables here
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+
+# Change for multinode config
+DISTRIBUTED_ARGS=(
+    --nproc_per_node 8
+    --nnodes $NUM_NODES 
+    --node_rank $NODE_RANK
+    --master_addr $MASTER_ADDR 
+    --master_port 8768
+)
+echo "distributed args: ${DISTRIBUTED_ARGS[@]}"
+
+torchrun ${DISTRIBUTED_ARGS[@]} \
+    path/to/train.py 
+```
+
+in this script, you can use some variables:
+
+  - NUM_NODES   : number of nodes
+  - MASTER_ADDR : address of master node
+  - NODE_RANK   : rank of each node
+  - TASK_ID     : task id
+
+for more details, you can run `./mrunner -h` for help
